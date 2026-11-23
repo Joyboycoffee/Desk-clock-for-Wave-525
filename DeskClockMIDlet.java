@@ -1,6 +1,6 @@
-import javax.microedition.midlet.*;
+import javax.microedition.midlet.MIDlet;
 import javax.microedition.lcdui.*;
-import java.util.*;
+import java.util.Calendar;
 
 public class DeskClockMIDlet extends MIDlet implements Runnable {
 
@@ -8,75 +8,109 @@ public class DeskClockMIDlet extends MIDlet implements Runnable {
     private ClockCanvas canvas;
     private boolean running = true;
 
-    public DeskClockMIDlet() {
+    protected void startApp() {
         display = Display.getDisplay(this);
         canvas = new ClockCanvas();
-    }
-
-    protected void startApp() {
-        display.setCurrent(canvas);
-        Thread t = new Thread(this);
-        t.start();
+        canvas.setFullScreenMode(true); // removes softkeys and status bar
+        try {
+            display.setCurrent(canvas);
+        } catch (Exception e) {}
+        new Thread(this).start();
     }
 
     protected void pauseApp() {}
-
-    protected void destroyApp(boolean unconditional) {
-        running = false;
-    }
+    protected void destroyApp(boolean unconditional) { running = false; }
 
     public void run() {
         while (running) {
-            canvas.repaint();
-            try {
-                Thread.sleep(1000); // update every second
-            } catch (InterruptedException e) {}
+            if (canvas != null) {
+                canvas.repaint();
+            }
+            try { Thread.sleep(1000); } catch (Exception e) {}
         }
     }
 }
 
 class ClockCanvas extends Canvas {
 
+    public ClockCanvas() {
+        setFullScreenMode(true);
+    }
+
+    protected void showNotify() {
+        setFullScreenMode(true);
+    }
+
     protected void paint(Graphics g) {
         int w = getWidth();
         int h = getHeight();
 
-        // Background
+        // Background - fill entire screen
         g.setColor(0x000000);
         g.fillRect(0, 0, w, h);
 
-        // Time
-        Calendar cal = Calendar.getInstance();
-        String time =
-            two(cal.get(Calendar.HOUR_OF_DAY)) + ":" +
-            two(cal.get(Calendar.MINUTE)) + ":" +
-            two(cal.get(Calendar.SECOND));
+        Calendar c = Calendar.getInstance();
 
+        int hour = c.get(Calendar.HOUR);
+        if (hour == 0) hour = 12;
+
+        int min = c.get(Calendar.MINUTE);
+        boolean pm = (c.get(Calendar.AM_PM) == Calendar.PM);
+
+        String time =
+                two(hour) + ":" +
+                two(min) + " " +
+                (pm ? "PM" : "AM");
+
+        int day = c.get(Calendar.DAY_OF_MONTH);
+        int year = c.get(Calendar.YEAR);
         String date =
-            cal.get(Calendar.DAY_OF_MONTH) + "/" +
-            (cal.get(Calendar.MONTH) + 1) + "/" +
-            cal.get(Calendar.YEAR);
+                day + suffix(day) + " " +
+                month(c.get(Calendar.MONTH)) + ", " +
+                year;
 
         g.setColor(0xFFFFFF);
 
-        Font timeFont = Font.getFont(Font.FACE_SYSTEM,
-                                     Font.STYLE_BOLD,
-                                     Font.SIZE_LARGE);
-
-        Font dateFont = Font.getFont(Font.FACE_SYSTEM,
-                                     Font.STYLE_PLAIN,
-                                     Font.SIZE_MEDIUM);
-
+        // HUGE TIME - use largest available font, no layering
+        Font timeFont = Font.getFont(Font.FACE_PROPORTIONAL, Font.STYLE_BOLD, Font.SIZE_LARGE);
         g.setFont(timeFont);
-        g.drawString(time, w / 2, h / 2 - 20,
-                     Graphics.HCENTER | Graphics.BASELINE);
+        int timeY = (h / 3) + 20;
+        g.drawString(time, w / 2, timeY, Graphics.HCENTER | Graphics.BASELINE);
 
+        // DATE - smaller, below
+        Font dateFont = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
         g.setFont(dateFont);
-        g.drawString(date, w / 2, h / 2 + 20,
-                     Graphics.HCENTER | Graphics.BASELINE);
+        int dateY = (2 * h / 3) + 10;
+        g.drawString(date, w / 2, dateY, Graphics.HCENTER | Graphics.BASELINE);
     }
 
-    private String two(int n) {
-        return (n < 10) ? "0" + n : String.valueOf(n);
+    // Disable ALL keys and handle device rotation
+    protected void keyPressed(int keyCode) { handleKey(keyCode); }
+    protected void keyReleased(int keyCode) {}
+    protected void keyRepeated(int keyCode) {}
+
+    private void handleKey(int keyCode) {
+        // Suppress all key events
+        // Don't let any key do anything
+    }
+
+    private String two(int n) { return (n < 10) ? "0" + n : "" + n; }
+
+    private String month(int m) {
+        String[] names = {
+                "January","February","March","April","May","June",
+                "July","August","September","October","November","December"
+        };
+        return names[m];
+    }
+
+    private String suffix(int d) {
+        if (d >= 11 && d <= 13) return "th";
+        switch (d % 10) {
+            case 1: return "st";
+            case 2: return "nd";
+            case 3: return "rd";
+            default: return "th";
+        }
     }
 }
